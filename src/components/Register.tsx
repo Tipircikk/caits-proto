@@ -23,8 +23,8 @@ export default function Register() {
   const navigate = useNavigate();
 
   const validatePhone = (phone: string) => {
-    const phoneRegex = /^[0-9]{10,11}$/;
-    return phoneRegex.test(phone.replace(/\D/g, ''));
+    const phoneRegex = /^[0-9]{10}$/;
+    return phoneRegex.test(phone);
   };
 
   const validatePassword = (password: string) => {
@@ -47,18 +47,21 @@ export default function Register() {
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, '');
-    if (value.length <= 11) {
-      setFormData({ ...formData, phone: value });
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.startsWith('0')) {
+      value = value.slice(1);
+    }
+    if (value.length <= 10) {
+      setFormData(prev => ({ ...prev, phone: value }));
     }
   };
 
   const formatPhoneNumber = (phone: string) => {
-    if (phone.length === 0) return '';
-    if (phone.length <= 3) return phone;
-    if (phone.length <= 6) return `${phone.slice(0, 3)} ${phone.slice(3)}`;
-    if (phone.length <= 8) return `${phone.slice(0, 3)} ${phone.slice(3, 6)} ${phone.slice(6)}`;
-    return `${phone.slice(0, 3)} ${phone.slice(3, 6)} ${phone.slice(6, 8)} ${phone.slice(8)}`;
+    if (phone.length === 0) return '0';
+    if (phone.length <= 3) return `0${phone}`;
+    if (phone.length <= 6) return `0${phone.slice(0, 3)} ${phone.slice(3)}`;
+    if (phone.length <= 8) return `0${phone.slice(0, 3)} ${phone.slice(3, 6)} ${phone.slice(6)}`;
+    return `0${phone.slice(0, 3)} ${phone.slice(3, 6)} ${phone.slice(6, 8)} ${phone.slice(8)}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -82,7 +85,7 @@ export default function Register() {
     }
 
     if (!validatePhone(formData.phone)) {
-      setError('Geçerli bir telefon numarası giriniz (10 veya 11 haneli)');
+      setError('Geçerli bir telefon numarası giriniz (10 haneli)');
       return;
     }
 

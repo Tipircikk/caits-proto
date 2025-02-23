@@ -23,13 +23,22 @@ function PrivateRoute({ children, adminOnly = false }: { children: React.ReactNo
 }
 
 function App() {
+  const { isAuthenticated } = useStore();
+
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/database" element={<Database />} />
+        <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" />} />
+        <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/" />} />
+        <Route path="/forgot-password" element={!isAuthenticated ? <ForgotPassword /> : <Navigate to="/" />} />
+        <Route
+          path="/database"
+          element={
+            <PrivateRoute>
+              <Database />
+            </PrivateRoute>
+          }
+        />
         <Route
           path="/pending-approvals"
           element={
@@ -41,9 +50,13 @@ function App() {
         <Route
           path="/"
           element={
-            <PrivateRoute>
-              <Dashboard />
-            </PrivateRoute>
+            isAuthenticated ? (
+              <PrivateRoute>
+                <Dashboard />
+              </PrivateRoute>
+            ) : (
+              <Navigate to="/login" />
+            )
           }
         />
       </Routes>

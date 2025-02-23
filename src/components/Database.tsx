@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DatabaseIcon, Plus, Search, Car, ChevronRight, ArrowLeft, Building2, Lock, ParkingCircle } from 'lucide-react';
+import { Database as DatabaseIcon, Plus, Search, Car, ChevronRight, ArrowLeft, Building2 } from 'lucide-react';
 
 export default function Database() {
   const navigate = useNavigate();
@@ -29,14 +29,27 @@ export default function Database() {
     email: ''
   });
 
-  const { addPlateInfo, plateData, socket } = useStore();
+  const { addPlateInfo, plateData } = useStore();
   const [searchResults, setSearchResults] = useState<typeof plateData>([]);
 
+  // Arama formu açıldığında tüm kayıtları göster
   useEffect(() => {
     if (showSearchForm) {
       setSearchResults(plateData);
     }
   }, [showSearchForm, plateData]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const x = (e.clientX / window.innerWidth) * 100;
+      const y = (e.clientY / window.innerHeight) * 100;
+      document.documentElement.style.setProperty('--mouse-x', `${x}%`);
+      document.documentElement.style.setProperty('--mouse-y', `${y}%`);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,36 +84,12 @@ export default function Database() {
     setSearchResults(results);
   };
 
-  const formatPhoneNumber = (phone: string) => {
-    const cleaned = phone.replace(/\D/g, '');
-    if (cleaned.length === 0) return '';
-    if (cleaned.length <= 4) return cleaned;
-    if (cleaned.length <= 7) return `${cleaned.slice(0, 4)} ${cleaned.slice(4)}`;
-    if (cleaned.length <= 9) return `${cleaned.slice(0, 4)} ${cleaned.slice(4, 7)} ${cleaned.slice(7)}`;
-    return `${cleaned.slice(0, 4)} ${cleaned.slice(4, 7)} ${cleaned.slice(7, 9)} ${cleaned.slice(9)}`;
-  };
-
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>, isNewEntry: boolean = false) => {
-    const value = e.target.value.replace(/\D/g, '');
-    if (value.length <= 11) {
-      if (isNewEntry) {
-        setNewEntry({ ...newEntry, phone: value });
-      } else {
-        setSearchParams({ ...searchParams, phone: value });
-      }
-    }
-  };
-
-  const handleVehicleControl = (plate: string, action: 'engine' | 'parking') => {
-    socket.emit('vehicleControl', {
-      plate,
-      action,
-      command: action === 'engine' ? 'STOP_ENGINE' : 'AUTO_PARK'
-    });
-  };
-
   const sortedPlateData = [...plateData].sort((a, b) => a.plate.localeCompare(b.plate));
   const displayData = showSearchForm ? searchResults : sortedPlateData;
+
+  const buttonClasses = "w-full py-2 px-4 rounded-md text-sm font-medium transition-all duration-300 backdrop-blur-sm border border-white/20 shadow-lg";
+  const activeButtonClasses = "bg-indigo-600/40 hover:bg-indigo-600/60 text-white border-indigo-500/50";
+  const inactiveButtonClasses = "bg-white/5 hover:bg-white/10 text-white/80 hover:text-white";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
@@ -131,6 +120,7 @@ export default function Database() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-12 gap-6">
+          {/* Sol Sidebar */}
           <div className="col-span-3">
             <motion.div 
               className="bg-white/10 backdrop-blur-sm rounded-lg border border-white/10 p-6 shadow-xl"
@@ -138,179 +128,194 @@ export default function Database() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <div className="flex gap-4 mb-4">
-                <button
-                  onClick={() => {
-                    setShowAddForm(true);
-                    setShowSearchForm(false);
-                  }}
-                  className={`flex-1 py-2 px-4 rounded-md transition-colors duration-200 ${
-                    showAddForm
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white/10 text-white/60 hover:text-white'
-                  }`}
-                >
-                  <Plus className="h-5 w-5 mx-auto" />
-                  Bilgi Ekle
-                </button>
-                <button
-                  onClick={() => {
-                    setShowSearchForm(true);
-                    setShowAddForm(false);
-                    setSearchResults(plateData);
-                  }}
-                  className={`flex-1 py-2 px-4 rounded-md transition-colors duration-200 ${
-                    showSearchForm
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white/10 text-white/60 hover:text-white'
-                  }`}
-                >
-                  <Search className="h-5 w-5 mx-auto" />
-                  Bilgi Sorgula
-                </button>
-              </div>
+              <button
+                onClick={() => {
+                  setShowAddForm(true);
+                  setShowSearchForm(false);
+                  setSelectedEntry(null);
+                }}
+                className={`${buttonClasses} ${showAddForm ? activeButtonClasses : inactiveButtonClasses} mb-3`}
+              >
+                <Plus className="h-5 w-5 inline-block mr-2" />
+                Bilgi Ekle
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowSearchForm(true);
+                  setShowAddForm(false);
+                  setSelectedEntry(null);
+                  setSearchResults(plateData); // Tüm kayıtları göster
+                }}
+                className={`${buttonClasses} ${showSearchForm ? activeButtonClasses : inactiveButtonClasses}`}
+              >
+                <Search className="h-5 w-5 inline-block mr-2" />
+                Bilgi Sorgula
+              </button>
 
               <AnimatePresence>
-                {(showAddForm || showSearchForm) && (
-                  <motion.div
+                {showAddForm && (
+                  <motion.form 
+                    onSubmit={handleSubmit} 
+                    className="mt-4 space-y-4"
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="bg-white/5 backdrop-blur-md border border-white/20 rounded-lg p-6"
                   >
-                    <h3 className="text-lg font-semibold mb-4 text-white">
-                      {showAddForm ? 'Yeni Kayıt Ekle' : 'Kayıt Ara'}
-                    </h3>
-                    <form onSubmit={showAddForm ? handleSubmit : handleSearch} className="space-y-4">
+                    <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-white/80 mb-1">
-                          Plaka
-                        </label>
+                        <label className="block text-sm font-medium text-white/80 mb-1">Plaka</label>
                         <input
                           type="text"
-                          value={showAddForm ? newEntry.plate : searchParams.plate}
-                          onChange={(e) => {
-                            const value = e.target.value.toUpperCase();
-                            showAddForm
-                              ? setNewEntry({ ...newEntry, plate: value })
-                              : setSearchParams({ ...searchParams, plate: value });
-                          }}
-                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50"
+                          value={newEntry.plate}
+                          onChange={(e) => setNewEntry({ ...newEntry, plate: e.target.value.toUpperCase() })}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-300"
                           placeholder="34 ABC 123"
                         />
                       </div>
-
-                      {showAddForm && (
-                        <div>
-                          <label className="block text-sm font-medium text-white/80 mb-1">
-                            TC Kimlik No
-                          </label>
-                          <input
-                            type="text"
-                            value={newEntry.tcNo}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/\D/g, '');
-                              if (value.length <= 11) {
-                                setNewEntry({ ...newEntry, tcNo: value });
-                              }
-                            }}
-                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50"
-                            placeholder="12345678901"
-                            maxLength={11}
-                          />
-                        </div>
-                      )}
-
                       <div>
-                        <label className="block text-sm font-medium text-white/80 mb-1">
-                          Ad Soyad
-                        </label>
+                        <label className="block text-sm font-medium text-white/80 mb-1">TC Kimlik No</label>
                         <input
                           type="text"
-                          value={showAddForm ? newEntry.owner : searchParams.name}
-                          onChange={(e) => {
-                            showAddForm
-                              ? setNewEntry({ ...newEntry, owner: e.target.value })
-                              : setSearchParams({ ...searchParams, name: e.target.value });
-                          }}
-                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50"
+                          value={newEntry.tcNo}
+                          onChange={(e) => setNewEntry({ ...newEntry, tcNo: e.target.value })}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-300"
+                          placeholder="12345678901"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-white/80 mb-1">Araç Sahibi</label>
+                        <input
+                          type="text"
+                          value={newEntry.owner}
+                          onChange={(e) => setNewEntry({ ...newEntry, owner: e.target.value })}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-300"
                           placeholder="Ad Soyad"
                         />
                       </div>
-
-                      {showAddForm && (
-                        <>
-                          <div>
-                            <label className="block text-sm font-medium text-white/80 mb-1">
-                              Araç
-                            </label>
-                            <input
-                              type="text"
-                              value={newEntry.vehicle}
-                              onChange={(e) => setNewEntry({ ...newEntry, vehicle: e.target.value })}
-                              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50"
-                              placeholder="Marka Model"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-white/80 mb-1">
-                              Renk
-                            </label>
-                            <input
-                              type="text"
-                              value={newEntry.color}
-                              onChange={(e) => setNewEntry({ ...newEntry, color: e.target.value })}
-                              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50"
-                              placeholder="Araç Rengi"
-                            />
-                          </div>
-                        </>
-                      )}
-
                       <div>
-                        <label className="block text-sm font-medium text-white/80 mb-1">
-                          Telefon
-                        </label>
+                        <label className="block text-sm font-medium text-white/80 mb-1">Araç</label>
                         <input
-                          type="tel"
-                          value={formatPhoneNumber(showAddForm ? newEntry.phone : searchParams.phone)}
-                          onChange={(e) => handlePhoneChange(e, showAddForm)}
-                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50"
-                          placeholder="0555 555 55 55"
+                          type="text"
+                          value={newEntry.vehicle}
+                          onChange={(e) => setNewEntry({ ...newEntry, vehicle: e.target.value })}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-300"
+                          placeholder="Marka Model"
                         />
                       </div>
-
                       <div>
-                        <label className="block text-sm font-medium text-white/80 mb-1">
-                          E-posta
-                        </label>
+                        <label className="block text-sm font-medium text-white/80 mb-1">Renk</label>
+                        <input
+                          type="text"
+                          value={newEntry.color}
+                          onChange={(e) => setNewEntry({ ...newEntry, color: e.target.value })}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-300"
+                          placeholder="Araç Rengi"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-white/80 mb-1">Telefon</label>
+                        <input
+                          type="tel"
+                          value={newEntry.phone}
+                          onChange={(e) => setNewEntry({ ...newEntry, phone: e.target.value })}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-300"
+                          placeholder="0532 123 4567"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-white/80 mb-1">E-posta</label>
                         <input
                           type="email"
-                          value={showAddForm ? newEntry.email : searchParams.email}
-                          onChange={(e) => {
-                            showAddForm
-                              ? setNewEntry({ ...newEntry, email: e.target.value })
-                              : setSearchParams({ ...searchParams, email: e.target.value });
-                          }}
-                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50"
+                          value={newEntry.email}
+                          onChange={(e) => setNewEntry({ ...newEntry, email: e.target.value })}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-300"
                           placeholder="ornek@email.com"
                         />
                       </div>
+                    </div>
+                    <button
+                      type="submit"
+                      className={`${buttonClasses} bg-emerald-600/40 hover:bg-emerald-600/60 text-white border-emerald-500/50`}
+                    >
+                      Kaydet
+                    </button>
+                  </motion.form>
+                )}
 
-                      <button
-                        type="submit"
-                        className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors duration-200"
-                      >
-                        {showAddForm ? 'Kaydet' : 'Ara'}
-                      </button>
-                    </form>
-                  </motion.div>
+                {showSearchForm && (
+                  <motion.form 
+                    onSubmit={handleSearch} 
+                    className="mt-4 space-y-4"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                  >
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-white/80 mb-1">Ad Soyad</label>
+                        <input
+                          type="text"
+                          value={searchParams.name}
+                          onChange={(e) => setSearchParams({ ...searchParams, name: e.target.value })}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-300"
+                          placeholder="Ad Soyad"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-white/80 mb-1">TC Kimlik No</label>
+                        <input
+                          type="text"
+                          value={searchParams.tcNo}
+                          onChange={(e) => setSearchParams({ ...searchParams, tcNo: e.target.value })}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-300"
+                          placeholder="12345678901"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-white/80 mb-1">Telefon</label>
+                        <input
+                          type="tel"
+                          value={searchParams.phone}
+                          onChange={(e) => setSearchParams({ ...searchParams, phone: e.target.value })}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-300"
+                          placeholder="0532 123 4567"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-white/80 mb-1">Plaka</label>
+                        <input
+                          type="text"
+                          value={searchParams.plate}
+                          onChange={(e) => setSearchParams({ ...searchParams, plate: e.target.value.toUpperCase() })}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-300"
+                          placeholder="34 ABC 123"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-white/80 mb-1">E-posta</label>
+                        <input
+                          type="email"
+                          value={searchParams.email}
+                          onChange={(e) => setSearchParams({ ...searchParams, email: e.target.value })}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-300"
+                          placeholder="ornek@email.com"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="submit"
+                      className={`${buttonClasses} bg-emerald-600/40 hover:bg-emerald-600/60 text-white border-emerald-500/50`}
+                    >
+                      Ara
+                    </button>
+                  </motion.form>
                 )}
               </AnimatePresence>
             </motion.div>
           </div>
 
+          {/* Ana İçerik */}
           <div className="col-span-9">
             <motion.div 
               className="bg-white/10 backdrop-blur-sm rounded-lg border border-white/10 p-6 shadow-xl"
@@ -339,30 +344,14 @@ export default function Database() {
                           {entry.owner}
                         </span>
                       </div>
-                      <div className="flex items-center space-x-4">
-                        <button
-                          onClick={() => handleVehicleControl(entry.plate, 'engine')}
-                          className="text-yellow-500/80 hover:text-yellow-500 transition-colors duration-200"
-                          title="Motoru Durdur"
-                        >
-                          <Lock className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => handleVehicleControl(entry.plate, 'parking')}
-                          className="text-green-500/80 hover:text-green-500 transition-colors duration-200"
-                          title="Otomatik Park"
-                        >
-                          <ParkingCircle className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => setSelectedEntry(
-                            selectedEntry === entry.plate ? null : entry.plate
-                          )}
-                          className="text-white/60 hover:text-white transition-colors duration-200"
-                        >
-                          <ChevronRight className="h-5 w-5" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => setSelectedEntry(
+                          selectedEntry === entry.plate ? null : entry.plate
+                        )}
+                        className="text-white/60 hover:text-white transition-colors duration-300"
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </button>
                     </motion.div>
                   ))}
                 </AnimatePresence>
@@ -404,7 +393,7 @@ export default function Database() {
                           </div>
                           <div>
                             <p className="text-sm text-white/60">Telefon</p>
-                            <p className="font-medium text-white">{formatPhoneNumber(entry.phone)}</p>
+                            <p className="font-medium text-white">{entry.phone}</p>
                           </div>
                           <div>
                             <p className="text-sm text-white/60">E-posta</p>
@@ -420,6 +409,62 @@ export default function Database() {
           </div>
         </div>
       </div>
+
+      {/* Polis Merkezi Modal */}
+      <AnimatePresence>
+        {showPoliceStationModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white/10 backdrop-blur-md border border-white/20 rounded-lg p-6 w-full max-w-md"
+            >
+              <div className="flex items-center mb-4">
+                <Building2 className="h-6 w-6 text-indigo-400 mr-2" />
+                <h3 className="text-lg font-semibold text-white">Polis Merkezi Bilgisi</h3>
+              </div>
+              <p className="text-white/80 mb-4">
+                {selectedPlate} plakalı araç için polis merkezi bilgisi giriniz.
+              </p>
+              <input
+                type="text"
+                value={policeStation}
+                onChange={(e) => setPoliceStation(e.target.value)}
+                placeholder="Polis Merkezi Adı"
+                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 mb-4 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+              />
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowPoliceStationModal(false);
+                    setPoliceStation('');
+                    setSelectedPlate('');
+                  }}
+                  className="px-4 py-2 text-white/60 hover:text-white transition-colors duration-200"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPoliceStationModal(false);
+                    setPoliceStation('');
+                    setSelectedPlate('');
+                  }}
+                  className="px-4 py-2 bg-indigo-600/40 hover:bg-indigo-600/60 text-white rounded-md transition-colors duration-200 border border-indigo-500/50"
+                >
+                  Onayla
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

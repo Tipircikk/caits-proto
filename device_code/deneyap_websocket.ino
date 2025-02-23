@@ -13,16 +13,13 @@ const int websockets_port = 3000;                // Sunucu portu
 // Pin tanımlamaları
 const int CAMERA_DETECT_PIN = 13;    // Kamera bağlantı pini
 const int ENGINE_SENSOR_PIN = 14;    // Motor durum sensörü pini
-const int ENGINE_CONTROL_PIN = 15;   // Motor kontrol pini
-const int PARKING_CONTROL_PIN = 16;  // Park sistemi kontrol pini
-const int GPS_RX_PIN = 17;          // GPS modülü RX pini
-const int GPS_TX_PIN = 18;          // GPS modülü TX pini
+const int GPS_RX_PIN = 16;          // GPS modülü RX pini
+const int GPS_TX_PIN = 17;          // GPS modülü TX pini
+const int LOCK_CONTROL_PIN = 18;    // Kilit kontrol pini
+const int PARK_CONTROL_PIN = 19;    // Park kontrol pini
 
 WebSocketsClient webSocket;
 HardwareSerial gpsSerial(1); // UART1 için
-
-bool engineRunning = false;
-bool autoParkingActive = false;
 
 void setup() {
   Serial.begin(115200);
@@ -33,12 +30,12 @@ void setup() {
   // Pin modlarını ayarla
   pinMode(CAMERA_DETECT_PIN, INPUT);
   pinMode(ENGINE_SENSOR_PIN, INPUT);
-  pinMode(ENGINE_CONTROL_PIN, OUTPUT);
-  pinMode(PARKING_CONTROL_PIN, OUTPUT);
+  pinMode(LOCK_CONTROL_PIN, OUTPUT);
+  pinMode(PARK_CONTROL_PIN, OUTPUT);
   
-  // Başlangıçta motorun çalışmasına ve park sistemine izin ver
-  digitalWrite(ENGINE_CONTROL_PIN, HIGH);
-  digitalWrite(PARKING_CONTROL_PIN, LOW);
+  // Başlangıçta kontrol pinlerini pasif yap
+  digitalWrite(LOCK_CONTROL_PIN, LOW);
+  digitalWrite(PARK_CONTROL_PIN, LOW);
   
   // WiFi bağlantısı
   WiFi.begin(ssid, password);
@@ -68,14 +65,6 @@ void loop() {
     lastTime = millis();
     sendSensorData();
   }
-
-  // Motor ve park durumunu kontrol et
-  engineRunning = digitalRead(ENGINE_SENSOR_PIN) == HIGH;
-  
-  // Otomatik park aktifse ve motor çalışıyorsa
-  if (autoParkingActive && engineRunning) {
-    performAutoParking();
-  }
 }
 
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
@@ -97,44 +86,24 @@ void handleCommand(uint8_t * payload, size_t length) {
   DeserializationError error = deserializeJson(doc, payload);
   
   if (error) {
-    Serial.println("JSON çözümleme hatası!");
+    Serial.println("JSON ayrıştırma hatası!");
     return;
   }
-
-  const char* event = doc["event"];
-  if (strcmp(event, "vehicleCommand") == 0) {
-    const char* action = doc["action"];
-    const char* command = doc["command"];
-    
-    if (strcmp(action, "engine") == 0 && strcmp(command, "STOP_ENGINE") == 0) {
-      stopEngine();
-    }
-    else if (strcmp(action, "parking") == 0 && strcmp(command, "AUTO_PARK") == 0) {
-      startAutoParking();
-    }
+  
+  const char* command = doc["command"];
+  
+  if (strcmp(command, "LOCK") == 0) {
+    digitalWrite(LOCK_CONTROL_PIN, HIGH);
+    delay(1000);
+    digitalWrite(LOCK_CONTROL_PIN, LOW);
+    Serial.println("Araç kilitlendi!");
   }
-}
-
-void stopEngine() {
-  digitalWrite(ENGINE_CONTROL_PIN, LOW);
-  engineRunning = false;
-  Serial.println("Motor durduruldu!");
-}
-
-void startAutoParking() {
-  autoParkingActive = true;
-  digitalWrite(PARKING_CONTROL_PIN, HIGH);
-  Serial.println("Otomatik park başlatıldı!");
-}
-
-void performAutoParking() {
-  // Otomatik park işlemi simülasyonu
-  digitalWrite(ENGINE_CONTROL_PIN, LOW);
-  delay(1000);
-  digitalWrite(PARKING_CONTROL_PIN, LOW);
-  autoParkingActive = false;
-  engineRunning = false;
-  Serial.println("Otomatik park tamamlandı!");
+  else if (strcmp(command, "PARK") == 0) {
+    digitalWrite(PARK_CONTROL_PIN, HIGH);
+    delay(1000);
+    digitalWrite(PARK_CONTROL_PIN, LOW);
+    Serial.println("Araç park edildi!");
+  }
 }
 
 String getCameraStatus() {
@@ -142,7 +111,7 @@ String getCameraStatus() {
 }
 
 String getEngineStatus() {
-  return engineRunning ? "Çalışıyor" : "Durdu";
+  return digitalRead(ENGINE_SENSOR_PIN) == HIGH ? "Çalışıyor" : "Durdu";
 }
 
 void sendSensorData() {
@@ -152,8 +121,7 @@ void sendSensorData() {
   doc["gpsLocation"] = "41.0082° N, 28.9784° E"; // GPS verisi örneği
   doc["cameraStatus"] = getCameraStatus();
   doc["vehicleStatus"] = getEngineStatus();
-  doc["engineRunning"] = engineRunning;
-  doc["autoParking"] = autoParkingActive;
+  doc["engineRunning"] = digitalRead(ENGINE_SENSOR_PIN) == HIGH;
 
   // JSON verisini string'e çevir
   String jsonString;

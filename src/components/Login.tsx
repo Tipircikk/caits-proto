@@ -41,6 +41,13 @@ export default function Login() {
     }
   };
 
+  const handleTCChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '');
+    if (value.length <= 11) {
+      setUsername(value);
+    }
+  };
+
   return (
     <div className="min-h-screen relative overflow-hidden">
       <div className="animated-bg"></div>
@@ -90,7 +97,7 @@ export default function Login() {
               <input
                 type="text"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={handleTCChange}
                 className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md focus:outline-none focus:ring-2 focus:ring-white/50 text-white placeholder-white/50"
                 placeholder="11 haneli kimlik no"
                 maxLength={11}

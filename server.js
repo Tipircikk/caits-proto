@@ -27,16 +27,15 @@ io.on('connection', (socket) => {
     io.emit('updateData', data);
   });
 
-  socket.on('vehicleControl', (data) => {
-    console.log('Araç kontrol komutu:', data);
-    io.emit('vehicleCommand', data);
-  });
-
-  socket.on('complaintResolved', async ({ plate, policeStation }) => {
+  socket.on('complaintResolved', async ({ plate, policeStation, command }) => {
     try {
+      // DeneyapKart'a komut gönder
+      io.emit('deviceCommand', { command });
+      
       io.emit('complaintNotification', {
-        message: `🚨 Araç Bildirimi 🚨\n\nPlaka: ${plate}\nAracınız alınmıştır.\n${policeStation} Polis Merkezinden kimliğiniz ile teslim alabilirsiniz.`
+        message: `🚨 Araç Bildirimi 🚨\n\nPlaka: ${plate}\nAracınız ${command === 'PARK' ? 'park edildi' : 'kilitlendi'}.\n${policeStation} tarafından işlem yapıldı.`
       });
+      
       socket.emit('notificationSent', { success: true });
     } catch (error) {
       console.error('Bildirim gönderilemedi:', error);

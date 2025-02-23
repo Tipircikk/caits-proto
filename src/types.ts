@@ -1,6 +1,3 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-
 export enum UserRole {
   ADMIN = 'ADMIN',
   POLICE_CHIEF = 'POLICE_CHIEF',      // Başkomiser
@@ -76,13 +73,15 @@ export const SAMPLE_PLATE_DATA: LicensePlateInfo[] = [
 
 export const INITIAL_USERS: User[] = [
   {
-    id: "1",
-    username: "10101010101",
+    id: "admin",
+    username: "11111111111", // Admin TC
     role: UserRole.ADMIN,
-    name: "Admin",
+    name: "Sistem Yöneticisi",
     department: Department.POLICE,
     isApproved: true,
-    email: "admin@example.com",
-    phone: "05301234567"
+    email: "admin@ihbartakip.gov.tr",
+    phone: "5551234567",
+    station: "Emniyet Genel Müdürlüğü",
+    stationType: "POLICE"
   }
 ];

@@ -34,7 +34,17 @@ interface AppStore {
   addPlateInfo: (plateInfo: LicensePlateInfo) => void;
   removePlateInfo: (plate: string) => void;
   updateVehicleStatus: (complaintId: number, engineRunning: boolean, autoParking: boolean) => void;
+  canApproveUsers: (user: User) => boolean;
 }
+
+// Kullanıcının onay yetkisi olup olmadığını kontrol eden fonksiyon
+const hasApprovalAuthority = (role: UserRole): boolean => {
+  return [
+    UserRole.ADMIN,
+    UserRole.POLICE_CHIEF,
+    UserRole.GENDARMERIE_COMMANDER
+  ].includes(role);
+};
 
 const store = (set: any, get: any) => ({
   isAuthenticated: false,
@@ -52,6 +62,12 @@ const store = (set: any, get: any) => ({
     autoParking: false
   },
   socket,
+  
+  canApproveUsers: (user: User): boolean => {
+    if (!user) return false;
+    return hasApprovalAuthority(user.role);
+  },
+
   login: async (username: string, password: string) => {
     set({ isLoading: true });
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -59,12 +75,12 @@ const store = (set: any, get: any) => ({
     const user = get().users.find((u: User) => u.username === username && u.isApproved);
     
     if (user) {
-      if (user.role === UserRole.ADMIN && password === 'Admin123.') {
+      if (user.role === UserRole.ADMIN && password === 'Admin2024!') {
         set({ isAuthenticated: true, currentUser: user, isLoading: false });
         return true;
       }
       
-      if (user.role !== UserRole.ADMIN && password === 'user123') {
+      if (user.role !== UserRole.ADMIN && password === 'User123!') {
         set({ isAuthenticated: true, currentUser: user, isLoading: false });
         return true;
       }
@@ -73,7 +89,12 @@ const store = (set: any, get: any) => ({
     set({ isLoading: false });
     return false;
   },
-  logout: () => set({ isAuthenticated: false, currentUser: null }),
+
+  logout: () => {
+    set({ isAuthenticated: false, currentUser: null });
+    window.location.href = '/login';
+  },
+
   register: async (userData: any) => {
     set({ isLoading: true });
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -101,8 +122,16 @@ const store = (set: any, get: any) => ({
         pendingUsers: [...state.pendingUsers, newUser],
         isLoading: false
       }));
+      
+      // Onay yetkisi olan tüm kullanıcılar için bildirim güncelle
+      const currentUser = get().currentUser;
+      if (currentUser && hasApprovalAuthority(currentUser.role)) {
+        const unreadCount = get().pendingUsers.length + 1;
+        document.title = `(${unreadCount}) İhbar Takip Sistemi`;
+      }
     }
   },
+
   resetPassword: async (username: string, email: string) => {
     set({ isLoading: true });
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -115,6 +144,7 @@ const store = (set: any, get: any) => ({
     
     set({ isLoading: false });
   },
+
   approveUser: (userId: string) => {
     const user = get().pendingUsers.find((u: User) => u.id === userId);
     if (user) {
@@ -124,11 +154,13 @@ const store = (set: any, get: any) => ({
       }));
     }
   },
+
   rejectUser: (userId: string) => {
     set((state: AppStore) => ({
       pendingUsers: state.pendingUsers.filter(u => u.id !== userId)
     }));
   },
+
   addComplaint: (complaint: Omit<Complaint, 'id' | 'timestamp'>) =>
     set((state: AppStore) => ({
       complaints: [
@@ -142,6 +174,7 @@ const store = (set: any, get: any) => ({
         },
       ],
     })),
+
   resolveComplaint: (id: number, policeStation: string) =>
     set((state: AppStore) => {
       const complaint = state.complaints.find(c => c.id === id);
@@ -161,22 +194,27 @@ const store = (set: any, get: any) => ({
         ),
       };
     }),
+
   getPlateInfo: (plate: string) => {
     const state = get();
     return state.plateData.find((p: LicensePlateInfo) => p.plate === plate);
   },
+
   updateDeviceData: (data: any) => {
     set({ deviceData: data });
     socket.emit('deviceUpdate', data);
   },
+
   addPlateInfo: (plateInfo: LicensePlateInfo) =>
     set((state: AppStore) => ({
       plateData: [...state.plateData, plateInfo],
     })),
+
   removePlateInfo: (plate: string) =>
     set((state: AppStore) => ({
       plateData: state.plateData.filter(p => p.plate !== plate),
     })),
+
   updateVehicleStatus: (complaintId: number, engineRunning: boolean, autoParking: boolean) =>
     set((state: AppStore) => ({
       complaints: state.complaints.map(complaint =>
